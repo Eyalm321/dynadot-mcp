@@ -23,7 +23,7 @@ All tool names are prefixed `dynadot_`.
 ### From npm
 
 ```bash
-npm install -g dynadot-mcp
+npm install -g dynadot-mcp-server
 ```
 
 ### From GitHub Packages
@@ -51,7 +51,7 @@ Add to your MCP client config:
   "mcpServers": {
     "dynadot": {
       "command": "npx",
-      "args": ["-y", "dynadot-mcp"],
+      "args": ["-y", "dynadot-mcp-server"],
       "env": {
         "DYNADOT_API_KEY": "your_api_key_here"
       }
