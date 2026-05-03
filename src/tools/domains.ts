@@ -1,257 +1,268 @@
 import { z } from "zod";
-import { dynadotRequest } from "../client.js";
-
-const contactSchema = z.object({
-  registrant: z.number().optional().describe("Registrant contact ID"),
-  admin: z.number().optional().describe("Admin contact ID"),
-  tech: z.number().optional().describe("Tech contact ID"),
-  billing: z.number().optional().describe("Billing contact ID"),
-});
-
-const dnsRecordSchema = z.object({
-  type: z.string().describe("Record type (A, AAAA, CNAME, MX, TXT, SRV, etc.)"),
-  subdomain: z.string().optional().describe("Subdomain (host) — use empty string for root"),
-  value: z.string().describe("Record value (IP, hostname, text, etc.)"),
-  ttl: z.number().optional().describe("Time-to-live in seconds"),
-  priority: z.number().optional().describe("MX/SRV priority"),
-});
+import { dynadotRequest, toPunycode } from "../client.js";
 
 export const domainTools = [
   {
     name: "dynadot_search",
-    description: "Check availability of a single domain name and (optionally) get its price.",
+    description: "Check availability of one or more domains. Pass a single name or up to 100. IDN names are auto-punycoded.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name to check (e.g. 'example.com')"),
+      domains: z.array(z.string()).describe("Up to 100 domain names to check"),
       showPrice: z.boolean().optional().describe("Include pricing information"),
       currency: z.string().optional().describe("Currency code (e.g. 'USD')"),
     }),
-    handler: async (args: { domainName: string; showPrice?: boolean; currency?: string }) => {
-      return dynadotRequest("GET", `/domains/${encodeURIComponent(args.domainName)}/search`, undefined, {
-        showPrice: args.showPrice,
+    handler: async (args: { domains: string[]; showPrice?: boolean; currency?: string }) => {
+      return dynadotRequest("search", {
+        domain: args.domains.map(toPunycode),
+        show_price: args.showPrice ? 1 : undefined,
         currency: args.currency,
       });
     },
   },
   {
     name: "dynadot_bulk_search",
-    description: "Check availability for multiple domain names in one call.",
+    description: "Alias for `dynadot_search`. Check availability for multiple domains in one call (up to 100).",
     inputSchema: z.object({
-      domainNames: z.array(z.string()).describe("List of domain names to check"),
-      showPrice: z.boolean().optional().describe("Include pricing information"),
-      currency: z.string().optional().describe("Currency code"),
+      domainNames: z.array(z.string()).describe("Domain names to check"),
+      showPrice: z.boolean().optional(),
+      currency: z.string().optional(),
     }),
     handler: async (args: { domainNames: string[]; showPrice?: boolean; currency?: string }) => {
-      return dynadotRequest("GET", "/domains/bulk-search", undefined, {
-        domainNames: args.domainNames,
-        showPrice: args.showPrice,
+      return dynadotRequest("search", {
+        domain: args.domainNames.map(toPunycode),
+        show_price: args.showPrice ? 1 : undefined,
         currency: args.currency,
       });
-    },
-  },
-  {
-    name: "dynadot_suggestion_search",
-    description: "Generate domain name suggestions based on a keyword.",
-    inputSchema: z.object({
-      keyword: z.string().describe("Seed keyword for suggestions"),
-      tld: z.string().optional().describe("Limit suggestions to a specific TLD"),
-      showPrice: z.boolean().optional().describe("Include pricing"),
-    }),
-    handler: async (args: { keyword: string; tld?: string; showPrice?: boolean }) => {
-      return dynadotRequest("GET", "/domains/suggestion-search", undefined, {
-        keyword: args.keyword,
-        tld: args.tld,
-        showPrice: args.showPrice,
-      });
-    },
-  },
-  {
-    name: "dynadot_get_pending_push",
-    description: "Get pending domain push requests for the specified domain.",
-    inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-    }),
-    handler: async (args: { domainName: string }) => {
-      return dynadotRequest("GET", `/domains/${encodeURIComponent(args.domainName)}/pending-push`);
     },
   },
   {
     name: "dynadot_register",
     description: "Register a new domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain to register"),
-      years: z.number().describe("Registration period in years"),
-      contacts: contactSchema.optional().describe("Contact IDs (registrant/admin/tech/billing)"),
-      nameservers: z.array(z.string()).optional().describe("Nameservers for the domain"),
-      privacy: z.boolean().optional().describe("Enable WHOIS privacy"),
-      autoRenew: z.boolean().optional().describe("Enable auto-renewal"),
+      domainName: z.string().describe("Domain to register (IDN auto-punycoded)"),
+      duration: z.number().describe("Registration period in years"),
+      currency: z.string().optional().describe("Currency code"),
+      premium: z.boolean().optional().describe("Allow premium pricing"),
       coupon: z.string().optional().describe("Coupon code"),
+      registrantContact: z.number().optional().describe("Registrant contact ID"),
+      adminContact: z.number().optional().describe("Admin contact ID"),
+      technicalContact: z.number().optional().describe("Technical contact ID"),
+      billingContact: z.number().optional().describe("Billing contact ID"),
     }),
     handler: async (args: {
       domainName: string;
-      years: number;
-      contacts?: z.infer<typeof contactSchema>;
-      nameservers?: string[];
-      privacy?: boolean;
-      autoRenew?: boolean;
+      duration: number;
+      currency?: string;
+      premium?: boolean;
       coupon?: string;
+      registrantContact?: number;
+      adminContact?: number;
+      technicalContact?: number;
+      billingContact?: number;
     }) => {
-      return dynadotRequest("POST", "/domains/register", {
-        domainName: args.domainName,
-        years: args.years,
-        contacts: args.contacts,
-        nameservers: args.nameservers,
-        privacy: args.privacy,
-        autoRenew: args.autoRenew,
+      return dynadotRequest("register", {
+        domain: toPunycode(args.domainName),
+        duration: args.duration,
+        currency: args.currency,
+        premium: args.premium ? 1 : undefined,
+        coupon: args.coupon,
+        registrant_contact: args.registrantContact,
+        admin_contact: args.adminContact,
+        technical_contact: args.technicalContact,
+        billing_contact: args.billingContact,
+      });
+    },
+  },
+  {
+    name: "dynadot_bulk_register",
+    description: "Register multiple domains at once (up to 100).",
+    inputSchema: z.object({
+      domains: z.array(z.string()).describe("Domains to register"),
+      premium: z.boolean().optional(),
+      currency: z.string().optional(),
+      coupon: z.string().optional(),
+    }),
+    handler: async (args: { domains: string[]; premium?: boolean; currency?: string; coupon?: string }) => {
+      return dynadotRequest("bulk_register", {
+        domain: args.domains.map(toPunycode),
+        premium: args.premium ? 1 : undefined,
+        currency: args.currency,
         coupon: args.coupon,
       });
     },
   },
   {
     name: "dynadot_renew",
-    description: "Renew a domain for the specified number of years.",
+    description: "Renew a domain.",
     inputSchema: z.object({
       domainName: z.string().describe("Domain to renew"),
-      years: z.number().describe("Renewal period in years"),
-      coupon: z.string().optional().describe("Coupon code"),
+      duration: z.number().describe("Renewal period in years"),
+      currency: z.string().optional(),
+      year: z.number().optional().describe("Optional explicit expiration year"),
+      priceCheck: z.number().optional().describe("Maximum price you'll pay (server fails the call if actual exceeds this)"),
+      coupon: z.string().optional(),
+      noRenewIfLateRenewFeeNeeded: z.boolean().optional().describe("Cancel renewal if a late-renewal fee would be charged"),
     }),
-    handler: async (args: { domainName: string; years: number; coupon?: string }) => {
-      return dynadotRequest("POST", `/domains/${encodeURIComponent(args.domainName)}/renew`, {
-        years: args.years,
+    handler: async (args: {
+      domainName: string;
+      duration: number;
+      currency?: string;
+      year?: number;
+      priceCheck?: number;
+      coupon?: string;
+      noRenewIfLateRenewFeeNeeded?: boolean;
+    }) => {
+      return dynadotRequest("renew", {
+        domain: toPunycode(args.domainName),
+        duration: args.duration,
+        currency: args.currency,
+        year: args.year,
+        price_check: args.priceCheck,
         coupon: args.coupon,
+        no_renew_if_late_renew_fee_needed: args.noRenewIfLateRenewFeeNeeded ? 1 : undefined,
       });
     },
   },
   {
     name: "dynadot_transfer_in",
-    description: "Initiate an incoming transfer of a domain to Dynadot.",
+    description: "Initiate a transfer of a domain to Dynadot.",
     inputSchema: z.object({
       domainName: z.string().describe("Domain to transfer in"),
-      authCode: z.string().describe("Authorization code (EPP) from current registrar"),
-      contacts: contactSchema.optional().describe("Contact IDs"),
-      privacy: z.boolean().optional().describe("Enable WHOIS privacy"),
-      autoRenew: z.boolean().optional().describe("Enable auto-renewal"),
+      authCode: z.string().describe("Authorization (EPP) code"),
+      currency: z.string().optional(),
+      premium: z.boolean().optional(),
+      privacy: z.boolean().optional(),
+      nameservers: z.array(z.string()).optional().describe("Nameservers to set on transfer"),
+      coupon: z.string().optional(),
+      registrantContact: z.number().optional(),
+      adminContact: z.number().optional(),
+      technicalContact: z.number().optional(),
+      billingContact: z.number().optional(),
     }),
     handler: async (args: {
       domainName: string;
       authCode: string;
-      contacts?: z.infer<typeof contactSchema>;
+      currency?: string;
+      premium?: boolean;
       privacy?: boolean;
-      autoRenew?: boolean;
+      nameservers?: string[];
+      coupon?: string;
+      registrantContact?: number;
+      adminContact?: number;
+      technicalContact?: number;
+      billingContact?: number;
     }) => {
-      return dynadotRequest("POST", "/domains/transfer-in", {
-        domainName: args.domainName,
-        authCode: args.authCode,
-        contacts: args.contacts,
-        privacy: args.privacy,
-        autoRenew: args.autoRenew,
+      return dynadotRequest("transfer", {
+        domain: toPunycode(args.domainName),
+        auth: args.authCode,
+        currency: args.currency,
+        premium: args.premium ? 1 : undefined,
+        privacy: args.privacy ? 1 : undefined,
+        name_servers: args.nameservers,
+        coupon: args.coupon,
+        registrant_contact: args.registrantContact,
+        admin_contact: args.adminContact,
+        technical_contact: args.technicalContact,
+        billing_contact: args.billingContact,
       });
     },
   },
   {
     name: "dynadot_grace_delete",
-    description: "Delete a domain that is still in the grace period (full refund).",
+    description: "Delete a domain that's still in the grace period (full refund).",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain to delete"),
+      domainName: z.string(),
     }),
     handler: async (args: { domainName: string }) => {
-      return dynadotRequest("DELETE", `/domains/${encodeURIComponent(args.domainName)}/grace-delete`);
-    },
-  },
-  {
-    name: "dynadot_post_grace_delete",
-    description: "Delete a domain that is past the grace period.",
-    inputSchema: z.object({
-      domainName: z.string().describe("Domain to delete"),
-    }),
-    handler: async (args: { domainName: string }) => {
-      return dynadotRequest("DELETE", `/domains/${encodeURIComponent(args.domainName)}/post-grace-delete`);
+      return dynadotRequest("delete", { domain: toPunycode(args.domainName) });
     },
   },
   {
     name: "dynadot_restore",
-    description: "Restore a previously deleted domain (within the redemption period).",
+    description: "Restore a deleted domain (within the redemption period).",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain to restore"),
+      domainName: z.string(),
     }),
     handler: async (args: { domainName: string }) => {
-      return dynadotRequest("POST", `/domains/${encodeURIComponent(args.domainName)}/restore`);
+      return dynadotRequest("restore", { domain: toPunycode(args.domainName) });
     },
   },
   {
     name: "dynadot_domain_list",
-    description: "List all domains in the account.",
+    description: "List domains in the account.",
     inputSchema: z.object({
-      folder: z.string().optional().describe("Filter by folder name or ID"),
-      limit: z.number().optional().describe("Page size"),
-      offset: z.number().optional().describe("Page offset"),
+      countPerPage: z.number().optional().describe("Items per page"),
+      pageIndex: z.number().optional().describe("Zero-indexed page number"),
+      sort: z.string().optional().describe("Sort key"),
+      customerId: z.number().optional(),
     }),
-    handler: async (args: { folder?: string; limit?: number; offset?: number }) => {
-      return dynadotRequest("GET", "/domains", undefined, {
-        folder: args.folder,
-        limit: args.limit,
-        offset: args.offset,
+    handler: async (args: { countPerPage?: number; pageIndex?: number; sort?: string; customerId?: number }) => {
+      return dynadotRequest("list_domain", {
+        count_per_page: args.countPerPage,
+        page_index: args.pageIndex,
+        sort: args.sort,
+        customer_id: args.customerId,
       });
     },
   },
   {
     name: "dynadot_domain_info",
-    description: "Get full details for a single domain.",
+    description: "Get full details for a single domain (settings, contacts, status). IDN auto-punycoded.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
+      domainName: z.string(),
     }),
     handler: async (args: { domainName: string }) => {
-      return dynadotRequest("GET", `/domains/${encodeURIComponent(args.domainName)}`);
+      return dynadotRequest("domain_info", { domain: toPunycode(args.domainName) });
     },
   },
   {
     name: "dynadot_domain_appraisal",
     description: "Get an estimated value (appraisal) for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
+      domainName: z.string(),
     }),
     handler: async (args: { domainName: string }) => {
-      return dynadotRequest("GET", `/domains/${encodeURIComponent(args.domainName)}/appraisal`);
+      return dynadotRequest("domain_appraisal", { domain: toPunycode(args.domainName) });
     },
   },
   {
-    name: "dynadot_domain_get_tld_price",
-    description: "Get TLD pricing details for a domain (register/renew/transfer prices for its TLD).",
+    name: "dynadot_lock_domain",
+    description: "Lock a domain (prevent transfers).",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
+      domainName: z.string(),
     }),
     handler: async (args: { domainName: string }) => {
-      return dynadotRequest("GET", `/domains/${encodeURIComponent(args.domainName)}/tld-price`);
+      return dynadotRequest("lock_domain", { domain: toPunycode(args.domainName) });
     },
   },
   {
     name: "dynadot_set_domain_forwarding",
-    description: "Set up domain forwarding (HTTP redirect) for a domain.",
+    description: "Set HTTP forwarding for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      url: z.string().describe("Destination URL"),
-      type: z.string().optional().describe("Forwarding type (e.g. '301', '302')"),
-      masking: z.boolean().optional().describe("Use URL masking (frame forwarding)"),
+      domainName: z.string(),
+      forwardUrl: z.string().describe("Destination URL"),
+      isTemp: z.boolean().optional().describe("True for 302 (temporary), false/omit for 301"),
     }),
-    handler: async (args: { domainName: string; url: string; type?: string; masking?: boolean }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/forwarding`, {
-        url: args.url,
-        type: args.type,
-        masking: args.masking,
+    handler: async (args: { domainName: string; forwardUrl: string; isTemp?: boolean }) => {
+      return dynadotRequest("set_forwarding", {
+        domain: toPunycode(args.domainName),
+        forward_url: args.forwardUrl,
+        is_temp: args.isTemp ? 1 : undefined,
       });
     },
   },
   {
     name: "dynadot_set_stealth_forwarding",
-    description: "Set stealth (URL-hiding) forwarding for a domain.",
+    description: "Set stealth (frame) forwarding for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      url: z.string().describe("Destination URL"),
-      masking: z.boolean().optional().describe("Use URL masking"),
+      domainName: z.string(),
+      stealthUrl: z.string().describe("Destination URL"),
+      stealthTitle: z.string().optional().describe("Page title shown in browser tab"),
     }),
-    handler: async (args: { domainName: string; url: string; masking?: boolean }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/stealth-forwarding`, {
-        url: args.url,
-        masking: args.masking,
+    handler: async (args: { domainName: string; stealthUrl: string; stealthTitle?: string }) => {
+      return dynadotRequest("set_stealth", {
+        domain: toPunycode(args.domainName),
+        stealth_url: args.stealthUrl,
+        stealth_title: args.stealthTitle,
       });
     },
   },
@@ -259,47 +270,75 @@ export const domainTools = [
     name: "dynadot_set_email_forwarding",
     description: "Configure email forwarding rules for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
+      domainName: z.string(),
+      forwardType: z.string().describe("Forward type (e.g. 'username_to_email', 'mx_only')"),
       forwards: z.array(z.object({
-        from: z.string().describe("Local part / alias (e.g. 'sales' for sales@domain)"),
-        to: z.string().describe("Destination email address"),
-      })).describe("List of email forwards"),
+        username: z.string().describe("Local part / alias (without @domain)"),
+        existEmail: z.string().describe("Destination email address"),
+      })).optional().describe("Up to 10 username→email forwards"),
+      mxHosts: z.array(z.object({
+        host: z.string().describe("MX hostname"),
+        distance: z.number().describe("MX distance/preference"),
+      })).optional().describe("Up to 3 MX hosts"),
     }),
-    handler: async (args: { domainName: string; forwards: Array<{ from: string; to: string }> }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/email-forwarding`, {
-        forwards: args.forwards,
+    handler: async (args: {
+      domainName: string;
+      forwardType: string;
+      forwards?: Array<{ username: string; existEmail: string }>;
+      mxHosts?: Array<{ host: string; distance: number }>;
+    }) => {
+      const params: Record<string, any> = {
+        domain: toPunycode(args.domainName),
+        forward_type: args.forwardType,
+      };
+      args.forwards?.forEach((f, i) => {
+        params[`username${i}`] = f.username;
+        params[`exist_email${i}`] = f.existEmail;
       });
+      args.mxHosts?.forEach((m, i) => {
+        params[`mx_host${i}`] = m.host;
+        params[`mx_distance${i}`] = m.distance;
+      });
+      return dynadotRequest("set_email_forward", params);
     },
   },
   {
     name: "dynadot_set_renew_option",
-    description: "Set the renewal option (auto-renew, do-not-renew, etc.) for a domain.",
+    description: "Set the renewal option (donot, auto, reset) for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      renewOption: z.string().describe("Renewal option (e.g. 'auto', 'donotrenew', 'reset')"),
+      domainName: z.string(),
+      renewOption: z.enum(["donot", "auto", "reset"]).describe("Renewal option"),
     }),
     handler: async (args: { domainName: string; renewOption: string }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/renew-option`, {
-        renewOption: args.renewOption,
+      return dynadotRequest("set_renew_option", {
+        domain: toPunycode(args.domainName),
+        renew_option: args.renewOption,
       });
     },
   },
   {
-    name: "dynadot_set_contacts",
-    description: "Update the contacts (registrant/admin/tech/billing) for a domain.",
+    name: "dynadot_set_whois",
+    description: "Set the WHOIS contacts (registrant/admin/tech/billing) for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      registrant: z.number().optional().describe("Registrant contact ID"),
-      admin: z.number().optional().describe("Admin contact ID"),
-      tech: z.number().optional().describe("Tech contact ID"),
-      billing: z.number().optional().describe("Billing contact ID"),
+      domainName: z.string(),
+      registrantContact: z.number().describe("Registrant contact ID"),
+      adminContact: z.number().describe("Admin contact ID"),
+      technicalContact: z.number().describe("Technical contact ID"),
+      billingContact: z.number().describe("Billing contact ID"),
     }),
-    handler: async (args: { domainName: string; registrant?: number; admin?: number; tech?: number; billing?: number }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/contacts`, {
-        registrant: args.registrant,
-        admin: args.admin,
-        tech: args.tech,
-        billing: args.billing,
+    handler: async (args: {
+      domainName: string;
+      registrantContact: number;
+      adminContact: number;
+      technicalContact: number;
+      billingContact: number;
+    }) => {
+      return dynadotRequest("set_whois", {
+        domain: toPunycode(args.domainName),
+        registrant_contact: args.registrantContact,
+        admin_contact: args.adminContact,
+        technical_contact: args.technicalContact,
+        billing_contact: args.billingContact,
       });
     },
   },
@@ -307,107 +346,98 @@ export const domainTools = [
     name: "dynadot_set_folder",
     description: "Move a domain to a folder.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      folderId: z.number().describe("Target folder ID"),
+      domainName: z.string(),
+      folder: z.string().describe("Folder name"),
+      folderId: z.number().optional().describe("Folder ID (alternative to name)"),
     }),
-    handler: async (args: { domainName: string; folderId: number }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/folder`, {
+    handler: async (args: { domainName: string; folder: string; folderId?: number }) => {
+      return dynadotRequest("set_folder", {
+        domain: toPunycode(args.domainName),
+        folder: args.folder,
         folder_id: args.folderId,
       });
     },
   },
   {
-    name: "dynadot_set_domain_lock_status",
-    description: "Enable or disable the registrar lock on a domain.",
-    inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      lockStatus: z.boolean().describe("true to lock, false to unlock"),
-    }),
-    handler: async (args: { domainName: string; lockStatus: boolean }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/lock-status`, {
-        lockStatus: args.lockStatus,
-      });
-    },
-  },
-  {
     name: "dynadot_get_transfer_status",
-    description: "Get the status of an in-progress incoming transfer.",
+    description: "Check the status of a transfer order.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
+      domainName: z.string(),
+      transferType: z.enum(["away", "in"]).describe("Transfer direction"),
     }),
-    handler: async (args: { domainName: string }) => {
-      return dynadotRequest("GET", `/domains/${encodeURIComponent(args.domainName)}/transfer-status`);
+    handler: async (args: { domainName: string; transferType: string }) => {
+      return dynadotRequest("get_transfer_status", {
+        domain: toPunycode(args.domainName),
+        transfer_type: args.transferType,
+      });
     },
   },
   {
     name: "dynadot_get_transfer_auth_code",
     description: "Retrieve the authorization (EPP) code for transferring a domain away.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
+      domainName: z.string(),
     }),
     handler: async (args: { domainName: string }) => {
-      return dynadotRequest("GET", `/domains/${encodeURIComponent(args.domainName)}/auth-code`);
+      return dynadotRequest("get_transfer_auth_code", { domain: toPunycode(args.domainName) });
     },
   },
   {
-    name: "dynadot_domain_get_nameserver",
-    description: "Get the nameservers configured for a domain.",
+    name: "dynadot_set_ns",
+    description: "Set the nameservers for a domain (up to 13).",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-    }),
-    handler: async (args: { domainName: string }) => {
-      return dynadotRequest("GET", `/domains/${encodeURIComponent(args.domainName)}/nameservers`);
-    },
-  },
-  {
-    name: "dynadot_domain_set_nameserver",
-    description: "Set the nameservers for a domain.",
-    inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      nameservers: z.array(z.string()).describe("Nameserver hostnames"),
+      domainName: z.string(),
+      nameservers: z.array(z.string()).describe("Nameserver hostnames (max 13)"),
     }),
     handler: async (args: { domainName: string; nameservers: string[] }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/nameservers`, {
-        nameservers: args.nameservers,
-      });
+      const params: Record<string, any> = { domain: toPunycode(args.domainName) };
+      args.nameservers.forEach((ns, i) => { params[`ns${i}`] = ns; });
+      return dynadotRequest("set_ns", params);
     },
   },
   {
     name: "dynadot_set_hosting",
-    description: "Assign a hosting plan to a domain.",
+    description: "Set the hosting type for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      hostingId: z.number().describe("Hosting plan ID"),
+      domainName: z.string(),
+      hostingType: z.string().describe("Hosting type identifier"),
+      mobileViewOn: z.boolean().optional(),
     }),
-    handler: async (args: { domainName: string; hostingId: number }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/hosting`, {
-        hosting_id: args.hostingId,
+    handler: async (args: { domainName: string; hostingType: string; mobileViewOn?: boolean }) => {
+      return dynadotRequest("set_hosting", {
+        domain: toPunycode(args.domainName),
+        hosting_type: args.hostingType,
+        mobile_view_on: args.mobileViewOn ? 1 : undefined,
       });
     },
   },
   {
     name: "dynadot_set_parking",
-    description: "Set the parking type for a domain.",
+    description: "Set parking for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      parkingType: z.string().describe("Parking type (e.g. 'dynadot', 'cashparking', 'forsale')"),
+      domainName: z.string(),
+      withAds: z.boolean().optional().describe("Enable monetization with ads"),
     }),
-    handler: async (args: { domainName: string; parkingType: string }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/parking`, {
-        parking_type: args.parkingType,
+    handler: async (args: { domainName: string; withAds?: boolean }) => {
+      return dynadotRequest("set_parking", {
+        domain: toPunycode(args.domainName),
+        with_ads: args.withAds ? 1 : undefined,
       });
     },
   },
   {
     name: "dynadot_set_privacy",
-    description: "Enable or disable WHOIS privacy on a domain.",
+    description: "Configure WHOIS privacy for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      privacyStatus: z.string().describe("Privacy status (e.g. 'full', 'partial', 'off')"),
+      domainName: z.string(),
+      option: z.string().describe("Privacy option (full, partial, off)"),
+      whoisPrivacyOption: z.string().describe("WHOIS privacy detail option"),
     }),
-    handler: async (args: { domainName: string; privacyStatus: string }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/privacy`, {
-        privacyStatus: args.privacyStatus,
+    handler: async (args: { domainName: string; option: string; whoisPrivacyOption: string }) => {
+      return dynadotRequest("set_privacy", {
+        domain: toPunycode(args.domainName),
+        option: args.option,
+        whois_privacy_option: args.whoisPrivacyOption,
       });
     },
   },
@@ -415,30 +445,29 @@ export const domainTools = [
     name: "dynadot_get_dnssec",
     description: "Get DNSSEC records for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
+      domainName: z.string(),
     }),
     handler: async (args: { domainName: string }) => {
-      return dynadotRequest("GET", `/domains/${encodeURIComponent(args.domainName)}/dnssec`);
+      return dynadotRequest("get_dnssec", { domain_name: toPunycode(args.domainName) });
     },
   },
   {
     name: "dynadot_set_dnssec",
-    description: "Set DNSSEC keys/DS records for a domain.",
+    description: "Set a DNSSEC DS record for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      dnssecKeys: z.array(z.object({
-        keyTag: z.number().describe("Key tag"),
-        algorithm: z.number().describe("Algorithm"),
-        digestType: z.number().describe("Digest type"),
-        digest: z.string().describe("Digest hex string"),
-      })).describe("DNSSEC DS record entries"),
+      domainName: z.string(),
+      keyTag: z.number(),
+      digestType: z.number(),
+      digest: z.string(),
+      algorithm: z.number(),
     }),
-    handler: async (args: {
-      domainName: string;
-      dnssecKeys: Array<{ keyTag: number; algorithm: number; digestType: number; digest: string }>;
-    }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/dnssec`, {
-        dnssecKeys: args.dnssecKeys,
+    handler: async (args: { domainName: string; keyTag: number; digestType: number; digest: string; algorithm: number }) => {
+      return dynadotRequest("set_dnssec", {
+        domain_name: toPunycode(args.domainName),
+        key_tag: args.keyTag,
+        digest_type: args.digestType,
+        digest: args.digest,
+        algorithm: args.algorithm,
       });
     },
   },
@@ -446,87 +475,124 @@ export const domainTools = [
     name: "dynadot_clear_dnssec",
     description: "Remove all DNSSEC records from a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
+      domainName: z.string(),
     }),
     handler: async (args: { domainName: string }) => {
-      return dynadotRequest("DELETE", `/domains/${encodeURIComponent(args.domainName)}/dnssec`);
+      return dynadotRequest("clear_dnssec", { domain_name: toPunycode(args.domainName) });
     },
   },
   {
     name: "dynadot_clear_domain_setting",
-    description: "Reset specified settings on a domain (e.g. forwarding, nameservers) to account defaults.",
+    description: "Reset a specific domain setting (forwarding, dns, ns, etc.) to defaults.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      settings: z.array(z.string()).describe("Settings to clear (e.g. ['forwarding', 'dns', 'nameservers'])"),
+      domainName: z.string(),
+      service: z.string().describe("Setting to clear (e.g. 'forwarding', 'dns', 'ns', 'email_forward')"),
     }),
-    handler: async (args: { domainName: string; settings: string[] }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/clear-settings`, {
-        settings: args.settings,
+    handler: async (args: { domainName: string; service: string }) => {
+      return dynadotRequest("set_clear_domain_setting", {
+        domain: toPunycode(args.domainName),
+        service: args.service,
       });
     },
   },
   {
-    name: "dynadot_push",
-    description: "Push (transfer) a domain to another Dynadot account or external registrar.",
+    name: "dynadot_get_domain_push_request",
+    description: "List pending domain push requests for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      targetRegistrar: z.string().optional().describe("Target registrar identifier"),
-      targetEmail: z.string().describe("Target account's email address"),
+      domainName: z.string(),
     }),
-    handler: async (args: { domainName: string; targetRegistrar?: string; targetEmail: string }) => {
-      return dynadotRequest("POST", `/domains/${encodeURIComponent(args.domainName)}/push`, {
-        targetRegistrar: args.targetRegistrar,
-        targetEmail: args.targetEmail,
-      });
+    handler: async (args: { domainName: string }) => {
+      return dynadotRequest("get_domain_push_request", { domain: toPunycode(args.domainName) });
     },
   },
   {
-    name: "dynadot_accept_push",
-    description: "Accept an incoming domain push.",
+    name: "dynadot_set_domain_push_request",
+    description: "Push a domain to another Dynadot account.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      pushToken: z.string().describe("Token from the push request"),
+      domainName: z.string(),
+      receiverPushUsername: z.string().describe("Recipient's Dynadot username"),
+      receiverEmail: z.string().optional().describe("Recipient's account email"),
+      currency: z.string().optional(),
+      unlockDomainForPush: z.boolean().optional(),
     }),
-    handler: async (args: { domainName: string; pushToken: string }) => {
-      return dynadotRequest("POST", `/domains/${encodeURIComponent(args.domainName)}/accept-push`, {
-        pushToken: args.pushToken,
+    handler: async (args: {
+      domainName: string;
+      receiverPushUsername: string;
+      receiverEmail?: string;
+      currency?: string;
+      unlockDomainForPush?: boolean;
+    }) => {
+      return dynadotRequest("set_domain_push_request", {
+        domain: toPunycode(args.domainName),
+        receiver_push_username: args.receiverPushUsername,
+        receiver_email: args.receiverEmail,
+        currency: args.currency,
+        unlock_domain_for_push: args.unlockDomainForPush ? 1 : undefined,
       });
     },
   },
   {
     name: "dynadot_get_dns",
-    description: "Get DNS records for a domain.",
+    description: "Retrieve current DNS records for a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
+      domainName: z.string(),
     }),
     handler: async (args: { domainName: string }) => {
-      return dynadotRequest("GET", `/domains/${encodeURIComponent(args.domainName)}/dns`);
+      return dynadotRequest("get_dns", { domain: toPunycode(args.domainName) });
     },
   },
   {
     name: "dynadot_set_dns",
-    description: "Create or replace DNS records for a domain.",
+    description: "Replace DNS records for a domain. Pass main records (root domain) and/or subdomain records.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      records: z.array(dnsRecordSchema).describe("DNS records to set"),
+      domainName: z.string(),
+      mainRecords: z.array(z.object({
+        type: z.string().describe("Record type (a, aaaa, cname, mx, txt, srv, etc.)"),
+        value: z.string().describe("Record value"),
+        valueX: z.string().optional().describe("Auxiliary value (e.g. MX priority)"),
+      })).optional().describe("Up to 20 root-level records"),
+      subRecords: z.array(z.object({
+        subdomain: z.string().describe("Subdomain (host) without the root"),
+        type: z.string(),
+        value: z.string(),
+        valueX: z.string().optional(),
+      })).optional().describe("Up to 100 subdomain records"),
+      ttl: z.number().optional().describe("TTL in seconds"),
+      addToCurrent: z.boolean().optional().describe("Append to existing records instead of replacing"),
     }),
-    handler: async (args: { domainName: string; records: z.infer<typeof dnsRecordSchema>[] }) => {
-      return dynadotRequest("POST", `/domains/${encodeURIComponent(args.domainName)}/dns`, {
-        records: args.records,
+    handler: async (args: {
+      domainName: string;
+      mainRecords?: Array<{ type: string; value: string; valueX?: string }>;
+      subRecords?: Array<{ subdomain: string; type: string; value: string; valueX?: string }>;
+      ttl?: number;
+      addToCurrent?: boolean;
+    }) => {
+      const params: Record<string, any> = { domain: toPunycode(args.domainName) };
+      args.mainRecords?.forEach((r, i) => {
+        params[`main_record_type${i}`] = r.type;
+        params[`main_record${i}`] = r.value;
+        if (r.valueX !== undefined) params[`main_recordx${i}`] = r.valueX;
       });
+      args.subRecords?.forEach((r, i) => {
+        params[`subdomain${i}`] = r.subdomain;
+        params[`sub_record_type${i}`] = r.type;
+        params[`sub_record${i}`] = r.value;
+        if (r.valueX !== undefined) params[`sub_recordx${i}`] = r.valueX;
+      });
+      if (args.ttl !== undefined) params.ttl = args.ttl;
+      if (args.addToCurrent) params.add_dns_to_current_setting = 1;
+      return dynadotRequest("set_dns2", params);
     },
   },
   {
     name: "dynadot_set_note",
     description: "Add or update a private note on a domain.",
     inputSchema: z.object({
-      domainName: z.string().describe("Domain name"),
-      note: z.string().describe("Note text"),
+      domainName: z.string(),
+      note: z.string(),
     }),
     handler: async (args: { domainName: string; note: string }) => {
-      return dynadotRequest("PUT", `/domains/${encodeURIComponent(args.domainName)}/note`, {
-        note: args.note,
-      });
+      return dynadotRequest("set_note", { domain: toPunycode(args.domainName), note: args.note });
     },
   },
 ];

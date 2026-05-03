@@ -3,81 +3,89 @@ import { dynadotRequest } from "../client.js";
 
 export const nameserverTools = [
   {
-    name: "dynadot_nameserver_get",
-    description: "Get details for a single nameserver record.",
+    name: "dynadot_get_ns",
+    description: "Retrieve nameserver details. Pass a hostname to get one, omit to list account servers.",
     inputSchema: z.object({
-      nameserverId: z.number().describe("Nameserver ID"),
+      nameserver: z.string().optional().describe("Nameserver hostname (omit to list)"),
     }),
-    handler: async (args: { nameserverId: number }) => {
-      return dynadotRequest("GET", `/nameservers/${args.nameserverId}`);
+    handler: async (args: { nameserver?: string }) => {
+      return dynadotRequest("get_ns", { nameserver: args.nameserver });
     },
   },
   {
-    name: "dynadot_nameserver_list",
-    description: "List all nameservers in the account.",
+    name: "dynadot_server_list",
+    description: "List all nameservers in the account (paginated).",
     inputSchema: z.object({
-      limit: z.number().optional().describe("Page size"),
-      offset: z.number().optional().describe("Page offset"),
+      pageIndex: z.number().optional(),
+      countPerPage: z.number().optional(),
     }),
-    handler: async (args: { limit?: number; offset?: number }) => {
-      return dynadotRequest("GET", "/nameservers", undefined, { limit: args.limit, offset: args.offset });
-    },
-  },
-  {
-    name: "dynadot_nameserver_register",
-    description: "Register a glue nameserver record (host on a domain you own).",
-    inputSchema: z.object({
-      nameserverName: z.string().describe("Nameserver hostname"),
-      ipv4: z.string().optional().describe("IPv4 address"),
-      ipv6: z.string().optional().describe("IPv6 address"),
-    }),
-    handler: async (args: { nameserverName: string; ipv4?: string; ipv6?: string }) => {
-      return dynadotRequest("POST", "/nameservers", {
-        nameserverName: args.nameserverName,
-        ipv4: args.ipv4,
-        ipv6: args.ipv6,
+    handler: async (args: { pageIndex?: number; countPerPage?: number }) => {
+      return dynadotRequest("server_list", {
+        page_index: args.pageIndex,
+        count_per_page: args.countPerPage,
       });
     },
   },
   {
-    name: "dynadot_nameserver_add_external",
-    description: "Add an external nameserver (hostname not registered with Dynadot).",
+    name: "dynadot_register_ns",
+    description: "Register a nameserver (host) with an IP.",
     inputSchema: z.object({
-      nameserverName: z.string().describe("Nameserver hostname"),
-      ipv4: z.string().optional().describe("IPv4 address"),
-      ipv6: z.string().optional().describe("IPv6 address"),
+      nameserver: z.string().describe("Nameserver hostname"),
+      ipAddress: z.string().describe("IP address (IPv4 or IPv6)"),
     }),
-    handler: async (args: { nameserverName: string; ipv4?: string; ipv6?: string }) => {
-      return dynadotRequest("POST", "/nameservers/external", {
-        nameserverName: args.nameserverName,
-        ipv4: args.ipv4,
-        ipv6: args.ipv6,
+    handler: async (args: { nameserver: string; ipAddress: string }) => {
+      return dynadotRequest("register_ns", {
+        nameserver: args.nameserver,
+        ip_address: args.ipAddress,
       });
     },
   },
   {
-    name: "dynadot_nameserver_set_ip",
-    description: "Update the IP address(es) for a nameserver.",
+    name: "dynadot_add_ns",
+    description: "Add a nameserver record.",
     inputSchema: z.object({
-      nameserverId: z.number().describe("Nameserver ID"),
-      ipv4: z.string().optional().describe("IPv4 address"),
-      ipv6: z.string().optional().describe("IPv6 address"),
+      nameserver: z.string(),
+      ipAddress: z.string(),
     }),
-    handler: async (args: { nameserverId: number; ipv4?: string; ipv6?: string }) => {
-      return dynadotRequest("PUT", `/nameservers/${args.nameserverId}/ip`, {
-        ipv4: args.ipv4,
-        ipv6: args.ipv6,
+    handler: async (args: { nameserver: string; ipAddress: string }) => {
+      return dynadotRequest("add_ns", {
+        nameserver: args.nameserver,
+        ip_address: args.ipAddress,
       });
     },
   },
   {
-    name: "dynadot_nameserver_delete",
-    description: "Remove a nameserver record.",
+    name: "dynadot_set_ns_ip",
+    description: "Update the IP for a nameserver.",
     inputSchema: z.object({
-      nameserverId: z.number().describe("Nameserver ID"),
+      nameserver: z.string(),
+      ipAddress: z.string(),
     }),
-    handler: async (args: { nameserverId: number }) => {
-      return dynadotRequest("DELETE", `/nameservers/${args.nameserverId}`);
+    handler: async (args: { nameserver: string; ipAddress: string }) => {
+      return dynadotRequest("set_ns_ip", {
+        nameserver: args.nameserver,
+        ip_address: args.ipAddress,
+      });
+    },
+  },
+  {
+    name: "dynadot_delete_ns",
+    description: "Delete a nameserver record.",
+    inputSchema: z.object({
+      nameserver: z.string(),
+    }),
+    handler: async (args: { nameserver: string }) => {
+      return dynadotRequest("delete_ns", { nameserver: args.nameserver });
+    },
+  },
+  {
+    name: "dynadot_delete_ns_by_domain",
+    description: "Remove all nameservers for a domain.",
+    inputSchema: z.object({
+      domainName: z.string(),
+    }),
+    handler: async (args: { domainName: string }) => {
+      return dynadotRequest("delete_ns_by_domain", { domain: args.domainName });
     },
   },
 ];

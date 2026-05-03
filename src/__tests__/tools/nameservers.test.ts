@@ -20,45 +20,38 @@ describe("nameserverTools", () => {
     mockRequest.mockClear();
   });
 
-  it("dynadot_nameserver_get GETs by id", async () => {
-    await findTool("dynadot_nameserver_get").handler({ nameserverId: 7 });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/nameservers/7");
+  it("dynadot_get_ns by hostname", async () => {
+    await findTool("dynadot_get_ns").handler({ nameserver: "ns1.x.com" });
+    expect(mockRequest).toHaveBeenCalledWith("get_ns", { nameserver: "ns1.x.com" });
   });
 
-  it("dynadot_nameserver_list paginates", async () => {
-    await findTool("dynadot_nameserver_list").handler({ limit: 10, offset: 0 });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/nameservers", undefined, { limit: 10, offset: 0 });
+  it("dynadot_server_list", async () => {
+    await findTool("dynadot_server_list").handler({ pageIndex: 0, countPerPage: 25 });
+    expect(mockRequest).toHaveBeenCalledWith("server_list", { page_index: 0, count_per_page: 25 });
   });
 
-  it("dynadot_nameserver_register POSTs glue NS", async () => {
-    await findTool("dynadot_nameserver_register").handler({
-      nameserverName: "ns1.example.com",
-      ipv4: "1.2.3.4",
-      ipv6: "::1",
-    });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/nameservers", {
-      nameserverName: "ns1.example.com",
-      ipv4: "1.2.3.4",
-      ipv6: "::1",
-    });
+  it("dynadot_register_ns", async () => {
+    await findTool("dynadot_register_ns").handler({ nameserver: "ns1.x.com", ipAddress: "1.2.3.4" });
+    expect(mockRequest).toHaveBeenCalledWith("register_ns", { nameserver: "ns1.x.com", ip_address: "1.2.3.4" });
   });
 
-  it("dynadot_nameserver_add_external POSTs external NS", async () => {
-    await findTool("dynadot_nameserver_add_external").handler({ nameserverName: "ns1.other.com" });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/nameservers/external", {
-      nameserverName: "ns1.other.com",
-      ipv4: undefined,
-      ipv6: undefined,
-    });
+  it("dynadot_add_ns", async () => {
+    await findTool("dynadot_add_ns").handler({ nameserver: "ns1.x.com", ipAddress: "1.2.3.4" });
+    expect(mockRequest).toHaveBeenCalledWith("add_ns", { nameserver: "ns1.x.com", ip_address: "1.2.3.4" });
   });
 
-  it("dynadot_nameserver_set_ip PUTs ip", async () => {
-    await findTool("dynadot_nameserver_set_ip").handler({ nameserverId: 7, ipv4: "5.6.7.8" });
-    expect(mockRequest).toHaveBeenCalledWith("PUT", "/nameservers/7/ip", { ipv4: "5.6.7.8", ipv6: undefined });
+  it("dynadot_set_ns_ip", async () => {
+    await findTool("dynadot_set_ns_ip").handler({ nameserver: "ns1.x.com", ipAddress: "5.6.7.8" });
+    expect(mockRequest).toHaveBeenCalledWith("set_ns_ip", { nameserver: "ns1.x.com", ip_address: "5.6.7.8" });
   });
 
-  it("dynadot_nameserver_delete DELETEs", async () => {
-    await findTool("dynadot_nameserver_delete").handler({ nameserverId: 7 });
-    expect(mockRequest).toHaveBeenCalledWith("DELETE", "/nameservers/7");
+  it("dynadot_delete_ns", async () => {
+    await findTool("dynadot_delete_ns").handler({ nameserver: "ns1.x.com" });
+    expect(mockRequest).toHaveBeenCalledWith("delete_ns", { nameserver: "ns1.x.com" });
+  });
+
+  it("dynadot_delete_ns_by_domain", async () => {
+    await findTool("dynadot_delete_ns_by_domain").handler({ domainName: "x.com" });
+    expect(mockRequest).toHaveBeenCalledWith("delete_ns_by_domain", { domain: "x.com" });
   });
 });

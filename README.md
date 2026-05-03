@@ -1,22 +1,23 @@
 # Dynadot MCP
 
-Model Context Protocol server for the [Dynadot RESTful API v2](https://www.dynadot.com/domain/api-document). Lets Claude (or any MCP client) manage your Dynadot domains, DNS, contacts, nameservers, folders, marketplace listings, auctions, site builder, and email hosting.
+Model Context Protocol server for the [Dynadot v3 API](https://www.dynadot.com/domain/api-document) (`api3.json`). Lets Claude (or any MCP client) manage your Dynadot domains, DNS, contacts, nameservers, folders, and the aftermarket.
 
 ## Tools
 
 The server exposes tools across the following Dynadot API surface areas:
 
-- **Domains** — search, bulk-search, suggestions, register, renew, transfer-in, delete (grace / post-grace), restore, list, get info, appraisal, TLD price, forwarding (regular / stealth / email), renew option, contacts, folder, lock, transfer status / auth code, nameservers, hosting, parking, privacy, DNSSEC, DNS records, push / accept-push, notes
-- **Contacts** — CRUD plus TLD-specific settings (.AERO, .CA, .EU, .FR, .HK, .IE, .IT, .LT, .LV, .MUSIC, .NO, .PT, .RO, .US) and the .CN audit flow
-- **Nameservers** — register glue / external NS, set IP, list, delete
-- **Orders** — get status, history, cancel transfer, authorize transfer-away, set transfer auth code
-- **Account** — get info, default nameservers / forwarding / email-forwarding / contacts / parking / hosting / renew option / DNS, clear defaults, account lock, list coupons
-- **Folders** — list, create, delete, rename, apply DNS / nameservers / contacts / parking / forwarding (regular / stealth / email) / hosting / renew option, clear settings
-- **Aftermarket / Marketplace** — list for sale, Buy-It-Now, expired closeout, backorders, open / closed auctions, place bid, bid history, installment plans, express-pay links, list on Afternic / Sedo, listings, WHOIS stats
-- **TLDs** — get TLD pricing
-- **Services** — site builder (get / list / create / upgrade), email hosting (create / list / upgrade / delete)
+- **Domains** — search (single / bulk), register (single / bulk), renew, transfer-in, delete (grace), restore, list, get info, appraisal, lock, forwarding (HTTP / stealth / email), renew option, WHOIS contacts, folder, nameservers, hosting, parking, privacy, DNSSEC, DNS records (set/get/clear), push (request / send), notes, transfer status / auth code
+- **Contacts** — CRUD plus EU / LT / LV TLD-specific settings, and the .CN audit flow
+- **Nameservers** — register, add, set IP, list, delete (single / by-domain)
+- **Orders** — list, get status, processing check, cancel transfer, authorize transfer-away, set transfer auth code
+- **Account** — info, balance, default WHOIS / nameservers / parking / forwarding / stealth / hosting / renew option / DNS / email-forward, clear defaults, list coupons
+- **Folders** — list, create, delete, rename, apply WHOIS / nameservers / parking / forwarding / stealth / hosting / DNS / email-forward / renew option, clear settings
+- **Aftermarket** — backorders (add / delete / list), expired-domain auctions (open / closed / details / bids / place bid), backorder auctions, expired closeout (list / buy), public marketplace listings (browse / get item / Buy-It-Now), set-for-sale, Afternic / Sedo confirmations
+- **TLDs** — pricing
 
-All tool names are prefixed `dynadot_`.
+All tool names are prefixed `dynadot_`. Domain names passed to any tool are automatically punycoded for IDN support (`krämer.ai` → `xn--krmer-hra.ai`).
+
+> **Note on auctions**: The auction-related endpoints (`get_open_auctions`, `place_auction_bid`, etc.) require Dynadot to grant your account auction-API access. Without it, those calls return 403 — contact Dynadot support to enable.
 
 ## Install
 

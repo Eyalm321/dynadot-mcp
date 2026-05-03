@@ -20,13 +20,23 @@ describe("tldTools", () => {
     mockRequest.mockClear();
   });
 
-  it("dynadot_tld_get_tld_price GETs price for a TLD", async () => {
-    await findTool("dynadot_tld_get_tld_price").handler({ tld: "com", currency: "USD" });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/tlds/com/price", undefined, { currency: "USD" });
+  it("dynadot_tld_price", async () => {
+    await findTool("dynadot_tld_price").handler({ currency: "USD", countPerPage: 100, pageIndex: 0 });
+    expect(mockRequest).toHaveBeenCalledWith("tld_price", {
+      currency: "USD",
+      count_per_page: 100,
+      page_index: 0,
+      sort: undefined,
+    });
   });
 
-  it("dynadot_tld_get_tld_price works without currency", async () => {
-    await findTool("dynadot_tld_get_tld_price").handler({ tld: "io" });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/tlds/io/price", undefined, { currency: undefined });
+  it("dynadot_tld_price with no params", async () => {
+    await findTool("dynadot_tld_price").handler({});
+    expect(mockRequest).toHaveBeenCalledWith("tld_price", {
+      currency: undefined,
+      count_per_page: undefined,
+      page_index: undefined,
+      sort: undefined,
+    });
   });
 });

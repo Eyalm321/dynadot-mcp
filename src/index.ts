@@ -9,11 +9,10 @@ import { accountTools } from "./tools/account.js";
 import { folderTools } from "./tools/folders.js";
 import { aftermarketTools } from "./tools/aftermarket.js";
 import { tldTools } from "./tools/tlds.js";
-import { serviceTools } from "./tools/services.js";
 
 const server = new McpServer({
   name: "dynadot-mcp",
-  version: "1.0.0",
+  version: "2.0.0",
 });
 
 const allTools = [
@@ -25,7 +24,6 @@ const allTools = [
   ...folderTools,
   ...aftermarketTools,
   ...tldTools,
-  ...serviceTools,
 ];
 
 for (const tool of allTools) {

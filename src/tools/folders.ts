@@ -4,177 +4,249 @@ import { dynadotRequest } from "../client.js";
 export const folderTools = [
   {
     name: "dynadot_folder_list",
-    description: "List domain folders in the account.",
+    description: "List domain folders.",
     inputSchema: z.object({
-      limit: z.number().optional().describe("Page size"),
-      offset: z.number().optional().describe("Page offset"),
+      pageIndex: z.number().optional(),
+      countPerPage: z.number().optional(),
     }),
-    handler: async (args: { limit?: number; offset?: number }) => {
-      return dynadotRequest("GET", "/folders", undefined, { limit: args.limit, offset: args.offset });
+    handler: async (args: { pageIndex?: number; countPerPage?: number }) => {
+      return dynadotRequest("folder_list", {
+        page_index: args.pageIndex,
+        count_per_page: args.countPerPage,
+      });
     },
   },
   {
-    name: "dynadot_folder_create",
+    name: "dynadot_create_folder",
     description: "Create a new domain folder.",
     inputSchema: z.object({
-      folderName: z.string().describe("Folder name"),
+      folderName: z.string(),
     }),
     handler: async (args: { folderName: string }) => {
-      return dynadotRequest("POST", "/folders", { folderName: args.folderName });
+      return dynadotRequest("create_folder", { folder_name: args.folderName });
     },
   },
   {
-    name: "dynadot_folder_delete",
-    description: "Delete a folder; domains inside it move to no-folder.",
+    name: "dynadot_delete_folder",
+    description: "Delete a folder.",
     inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
+      folderId: z.number(),
     }),
     handler: async (args: { folderId: number }) => {
-      return dynadotRequest("DELETE", `/folders/${args.folderId}`);
+      return dynadotRequest("delete_folder", { folder_id: args.folderId });
     },
   },
   {
-    name: "dynadot_folder_set_name",
+    name: "dynadot_set_folder_name",
     description: "Rename a folder.",
     inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
-      folderName: z.string().describe("New folder name"),
+      folderId: z.number(),
+      newName: z.string(),
     }),
-    handler: async (args: { folderId: number; folderName: string }) => {
-      return dynadotRequest("PUT", `/folders/${args.folderId}/name`, { folderName: args.folderName });
+    handler: async (args: { folderId: number; newName: string }) => {
+      return dynadotRequest("set_folder_name", { folder_id: args.folderId, new_name: args.newName });
     },
   },
   {
-    name: "dynadot_folder_set_dns",
-    description: "Apply DNS records to all domains in a folder.",
+    name: "dynadot_set_folder_whois",
+    description: "Apply WHOIS contacts to all domains in a folder.",
     inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
-      records: z.array(z.object({
-        type: z.string(),
-        subdomain: z.string().optional(),
-        value: z.string(),
-        ttl: z.number().optional(),
-        priority: z.number().optional(),
-      })).describe("DNS records"),
+      folderId: z.number(),
+      registrantContact: z.number(),
+      adminContact: z.number(),
+      technicalContact: z.number(),
+      billingContact: z.number(),
     }),
-    handler: async (args: { folderId: number; records: Array<Record<string, unknown>> }) => {
-      return dynadotRequest("PUT", `/folders/${args.folderId}/dns`, { records: args.records });
+    handler: async (args: {
+      folderId: number;
+      registrantContact: number;
+      adminContact: number;
+      technicalContact: number;
+      billingContact: number;
+    }) => {
+      return dynadotRequest("set_folder_whois", {
+        folder_id: args.folderId,
+        registrant_contact: args.registrantContact,
+        admin_contact: args.adminContact,
+        technical_contact: args.technicalContact,
+        billing_contact: args.billingContact,
+      });
     },
   },
   {
-    name: "dynadot_folder_set_nameserver",
+    name: "dynadot_set_folder_ns",
     description: "Apply nameservers to all domains in a folder.",
     inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
-      nameservers: z.array(z.string()).describe("Nameserver hostnames"),
+      folderId: z.number(),
+      nameservers: z.array(z.string()),
     }),
     handler: async (args: { folderId: number; nameservers: string[] }) => {
-      return dynadotRequest("PUT", `/folders/${args.folderId}/nameservers`, { nameservers: args.nameservers });
+      const params: Record<string, any> = { folder_id: args.folderId };
+      args.nameservers.forEach((ns, i) => { params[`ns${i}`] = ns; });
+      return dynadotRequest("set_folder_ns", params);
     },
   },
   {
-    name: "dynadot_folder_set_contacts",
-    description: "Apply contacts to all domains in a folder.",
+    name: "dynadot_set_folder_parking",
+    description: "Apply parking to all domains in a folder.",
     inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
-      registrant: z.number().optional().describe("Registrant contact ID"),
-      admin: z.number().optional().describe("Admin contact ID"),
-      tech: z.number().optional().describe("Tech contact ID"),
-      billing: z.number().optional().describe("Billing contact ID"),
+      folderId: z.number(),
+      withAds: z.boolean().optional(),
     }),
-    handler: async (args: { folderId: number; registrant?: number; admin?: number; tech?: number; billing?: number }) => {
-      const { folderId, ...rest } = args;
-      return dynadotRequest("PUT", `/folders/${folderId}/contacts`, rest);
-    },
-  },
-  {
-    name: "dynadot_folder_set_parking",
-    description: "Apply a parking type to all domains in a folder.",
-    inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
-      parkingType: z.string().describe("Parking type"),
-    }),
-    handler: async (args: { folderId: number; parkingType: string }) => {
-      return dynadotRequest("PUT", `/folders/${args.folderId}/parking`, { parking_type: args.parkingType });
-    },
-  },
-  {
-    name: "dynadot_folder_set_domain_forwarding",
-    description: "Apply domain forwarding to all domains in a folder.",
-    inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
-      url: z.string().describe("Destination URL"),
-      type: z.string().optional().describe("Forwarding type"),
-      masking: z.boolean().optional().describe("Use URL masking"),
-    }),
-    handler: async (args: { folderId: number; url: string; type?: string; masking?: boolean }) => {
-      return dynadotRequest("PUT", `/folders/${args.folderId}/forwarding`, {
-        url: args.url,
-        type: args.type,
-        masking: args.masking,
+    handler: async (args: { folderId: number; withAds?: boolean }) => {
+      return dynadotRequest("set_folder_parking", {
+        folder_id: args.folderId,
+        with_ads: args.withAds ? 1 : undefined,
       });
     },
   },
   {
-    name: "dynadot_folder_set_stealth_forwarding",
+    name: "dynadot_set_folder_forwarding",
+    description: "Apply HTTP forwarding to all domains in a folder.",
+    inputSchema: z.object({
+      folderId: z.number(),
+      forwardUrl: z.string(),
+      isTemp: z.boolean().optional(),
+    }),
+    handler: async (args: { folderId: number; forwardUrl: string; isTemp?: boolean }) => {
+      return dynadotRequest("set_folder_forwarding", {
+        folder_id: args.folderId,
+        forward_url: args.forwardUrl,
+        is_temp: args.isTemp ? 1 : undefined,
+      });
+    },
+  },
+  {
+    name: "dynadot_set_folder_stealth",
     description: "Apply stealth forwarding to all domains in a folder.",
     inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
-      url: z.string().describe("Destination URL"),
-      masking: z.boolean().optional().describe("Use URL masking"),
+      folderId: z.number(),
+      stealthUrl: z.string(),
+      stealthTitle: z.string().optional(),
     }),
-    handler: async (args: { folderId: number; url: string; masking?: boolean }) => {
-      return dynadotRequest("PUT", `/folders/${args.folderId}/stealth-forwarding`, {
-        url: args.url,
-        masking: args.masking,
+    handler: async (args: { folderId: number; stealthUrl: string; stealthTitle?: string }) => {
+      return dynadotRequest("set_folder_stealth", {
+        folder_id: args.folderId,
+        stealth_url: args.stealthUrl,
+        stealth_title: args.stealthTitle,
       });
     },
   },
   {
-    name: "dynadot_folder_set_email_forwarding",
-    description: "Apply email forwarding rules to all domains in a folder.",
+    name: "dynadot_set_folder_hosting",
+    description: "Apply a hosting type to all domains in a folder.",
     inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
+      folderId: z.number(),
+      hostingType: z.string(),
+      mobileViewOn: z.boolean().optional(),
+    }),
+    handler: async (args: { folderId: number; hostingType: string; mobileViewOn?: boolean }) => {
+      return dynadotRequest("set_folder_hosting", {
+        folder_id: args.folderId,
+        hosting_type: args.hostingType,
+        mobile_view_on: args.mobileViewOn ? 1 : undefined,
+      });
+    },
+  },
+  {
+    name: "dynadot_set_folder_dns",
+    description: "Apply DNS records to all domains in a folder.",
+    inputSchema: z.object({
+      folderId: z.number(),
+      mainRecords: z.array(z.object({
+        type: z.string(),
+        value: z.string(),
+        valueX: z.string().optional(),
+      })).optional(),
+      subRecords: z.array(z.object({
+        subdomain: z.string(),
+        type: z.string(),
+        value: z.string(),
+        valueX: z.string().optional(),
+      })).optional(),
+      ttl: z.number().optional(),
+    }),
+    handler: async (args: {
+      folderId: number;
+      mainRecords?: Array<{ type: string; value: string; valueX?: string }>;
+      subRecords?: Array<{ subdomain: string; type: string; value: string; valueX?: string }>;
+      ttl?: number;
+    }) => {
+      const params: Record<string, any> = { folder_id: args.folderId };
+      args.mainRecords?.forEach((r, i) => {
+        params[`main_record_type${i}`] = r.type;
+        params[`main_record${i}`] = r.value;
+        if (r.valueX !== undefined) params[`main_recordx${i}`] = r.valueX;
+      });
+      args.subRecords?.forEach((r, i) => {
+        params[`subdomain${i}`] = r.subdomain;
+        params[`sub_record_type${i}`] = r.type;
+        params[`sub_record${i}`] = r.value;
+        if (r.valueX !== undefined) params[`sub_recordx${i}`] = r.valueX;
+      });
+      if (args.ttl !== undefined) params.ttl = args.ttl;
+      return dynadotRequest("set_folder_dns2", params);
+    },
+  },
+  {
+    name: "dynadot_set_folder_email_forward",
+    description: "Apply email forwarding to all domains in a folder.",
+    inputSchema: z.object({
+      folderId: z.number(),
+      forwardType: z.string(),
       forwards: z.array(z.object({
-        from: z.string().describe("Local part"),
-        to: z.string().describe("Destination email"),
-      })).describe("Email forwards"),
+        username: z.string(),
+        existEmail: z.string(),
+      })).optional(),
+      mxHosts: z.array(z.object({
+        host: z.string(),
+        distance: z.number(),
+      })).optional(),
     }),
-    handler: async (args: { folderId: number; forwards: Array<{ from: string; to: string }> }) => {
-      return dynadotRequest("PUT", `/folders/${args.folderId}/email-forwarding`, { forwards: args.forwards });
+    handler: async (args: {
+      folderId: number;
+      forwardType: string;
+      forwards?: Array<{ username: string; existEmail: string }>;
+      mxHosts?: Array<{ host: string; distance: number }>;
+    }) => {
+      const params: Record<string, any> = { folder_id: args.folderId, forward_type: args.forwardType };
+      args.forwards?.forEach((f, i) => {
+        params[`username${i}`] = f.username;
+        params[`exist_email${i}`] = f.existEmail;
+      });
+      args.mxHosts?.forEach((m, i) => {
+        params[`mx_host${i}`] = m.host;
+        params[`mx_distance${i}`] = m.distance;
+      });
+      return dynadotRequest("set_folder_email_forward", params);
     },
   },
   {
-    name: "dynadot_folder_set_hosting",
-    description: "Apply a hosting plan to all domains in a folder.",
-    inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
-      hostingId: z.number().describe("Hosting plan ID"),
-    }),
-    handler: async (args: { folderId: number; hostingId: number }) => {
-      return dynadotRequest("PUT", `/folders/${args.folderId}/hosting`, { hosting_id: args.hostingId });
-    },
-  },
-  {
-    name: "dynadot_folder_set_renew_option",
+    name: "dynadot_set_folder_renew_option",
     description: "Apply a renewal option to all domains in a folder.",
     inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
-      renewOption: z.string().describe("Renewal option"),
+      folderId: z.number(),
+      renewOption: z.enum(["donot", "auto", "reset"]),
     }),
     handler: async (args: { folderId: number; renewOption: string }) => {
-      return dynadotRequest("PUT", `/folders/${args.folderId}/renew-option`, { renewOption: args.renewOption });
+      return dynadotRequest("set_folder_renew_option", {
+        folder_id: args.folderId,
+        renew_option: args.renewOption,
+      });
     },
   },
   {
-    name: "dynadot_folder_clear_setting",
-    description: "Reset specified settings on all domains in a folder.",
+    name: "dynadot_set_clear_folder_setting",
+    description: "Reset a specific setting on all domains in a folder.",
     inputSchema: z.object({
-      folderId: z.number().describe("Folder ID"),
-      settings: z.array(z.string()).describe("Settings to clear"),
+      folderId: z.number(),
+      service: z.string(),
     }),
-    handler: async (args: { folderId: number; settings: string[] }) => {
-      return dynadotRequest("PUT", `/folders/${args.folderId}/clear-settings`, { settings: args.settings });
+    handler: async (args: { folderId: number; service: string }) => {
+      return dynadotRequest("set_clear_folder_setting", {
+        folder_id: args.folderId,
+        service: args.service,
+      });
     },
   },
 ];

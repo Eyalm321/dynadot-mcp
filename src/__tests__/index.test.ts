@@ -7,7 +7,6 @@ import { accountTools } from "../tools/account.js";
 import { folderTools } from "../tools/folders.js";
 import { aftermarketTools } from "../tools/aftermarket.js";
 import { tldTools } from "../tools/tlds.js";
-import { serviceTools } from "../tools/services.js";
 
 const allTools = [
   ...domainTools,
@@ -18,7 +17,6 @@ const allTools = [
   ...folderTools,
   ...aftermarketTools,
   ...tldTools,
-  ...serviceTools,
 ];
 
 describe("Tool Registration", () => {
@@ -43,14 +41,14 @@ describe("Tool Registration", () => {
     }
   });
 
-  it("registers a reasonable number of tools", () => {
-    expect(allTools.length).toBeGreaterThanOrEqual(100);
+  it("registers a meaningful number of tools", () => {
+    expect(allTools.length).toBeGreaterThanOrEqual(60);
   });
 
   it("each module exports a non-empty array", () => {
     const modules = [
       domainTools, contactTools, nameserverTools, orderTools, accountTools,
-      folderTools, aftermarketTools, tldTools, serviceTools,
+      folderTools, aftermarketTools, tldTools,
     ];
     for (const mod of modules) {
       expect(Array.isArray(mod)).toBe(true);

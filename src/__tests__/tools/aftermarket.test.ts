@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../client.js", () => ({
-  dynadotRequest: vi.fn().mockResolvedValue({ success: true }),
-}));
+vi.mock("../../client.js", async () => {
+  const actual = await vi.importActual<typeof import("../../client.js")>("../../client.js");
+  return {
+    dynadotRequest: vi.fn().mockResolvedValue({ success: true }),
+    toPunycode: actual.toPunycode,
+  };
+});
 
 import { dynadotRequest } from "../../client.js";
 import { aftermarketTools } from "../../tools/aftermarket.js";
@@ -20,181 +24,133 @@ describe("aftermarketTools", () => {
     mockRequest.mockClear();
   });
 
-  it("dynadot_set_for_sale PUTs listing", async () => {
-    await findTool("dynadot_set_for_sale").handler({ domainName: "example.com", price: 1000 });
-    expect(mockRequest).toHaveBeenCalledWith("PUT", "/aftermarket/example.com/list", {
-      price: 1000,
-      platform: undefined,
+  it("dynadot_add_backorder_request", async () => {
+    await findTool("dynadot_add_backorder_request").handler({ domainName: "x.com" });
+    expect(mockRequest).toHaveBeenCalledWith("add_backorder_request", {
+      domain: "x.com",
+      currency: undefined,
+      coupon: undefined,
     });
   });
 
-  it("dynadot_set_other_platform_confirm_action POSTs confirmation", async () => {
-    await findTool("dynadot_set_other_platform_confirm_action").handler({
-      domainName: "example.com",
-      action: "approve",
-      token: "xyz",
-    });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/aftermarket/example.com/confirm", {
-      action: "approve",
-      token: "xyz",
-    });
+  it("dynadot_delete_backorder_request", async () => {
+    await findTool("dynadot_delete_backorder_request").handler({ domainName: "x.com" });
+    expect(mockRequest).toHaveBeenCalledWith("delete_backorder_request", { domain: "x.com" });
   });
 
-  it("dynadot_get_listing_item GETs listing", async () => {
-    await findTool("dynadot_get_listing_item").handler({ domainName: "example.com" });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/example.com/listing");
+  it("dynadot_backorder_request_list", async () => {
+    await findTool("dynadot_backorder_request_list").handler({ pageIndex: 0, countPerPage: 10 });
+    expect(mockRequest).toHaveBeenCalledWith("backorder_request_list", { page_index: 0, count_per_page: 10 });
   });
 
-  it("dynadot_buy_it_now POSTs price", async () => {
-    await findTool("dynadot_buy_it_now").handler({ domainName: "example.com", price: 500 });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/aftermarket/example.com/buy-now", { price: 500 });
+  it("dynadot_get_open_auctions", async () => {
+    await findTool("dynadot_get_open_auctions").handler({ pageIndex: 0, countPerPage: 100 });
+    expect(mockRequest).toHaveBeenCalledWith("get_open_auctions", { page_index: 0, count_per_page: 100 });
   });
 
-  it("dynadot_buy_expired_closeout_domain POSTs", async () => {
-    await findTool("dynadot_buy_expired_closeout_domain").handler({ domainName: "example.com", price: 30 });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/aftermarket/expired-closeout/buy", {
-      domainName: "example.com",
-      price: 30,
-    });
+  it("dynadot_get_closed_auctions", async () => {
+    await findTool("dynadot_get_closed_auctions").handler({ pageIndex: 0, countPerPage: 100 });
+    expect(mockRequest).toHaveBeenCalledWith("get_closed_auctions", { page_index: 0, count_per_page: 100 });
   });
 
-  it("dynadot_add_backorder_request POSTs backorder", async () => {
-    await findTool("dynadot_add_backorder_request").handler({ domainName: "example.com", backorderPrice: 80 });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/aftermarket/backorder", {
-      domainName: "example.com",
-      backorderPrice: 80,
-    });
-  });
-
-  it("dynadot_delete_backorder_request DELETEs", async () => {
-    await findTool("dynadot_delete_backorder_request").handler({ backorderId: 99 });
-    expect(mockRequest).toHaveBeenCalledWith("DELETE", "/aftermarket/backorder/99");
-  });
-
-  it("dynadot_get_closed_auctions GETs", async () => {
-    await findTool("dynadot_get_closed_auctions").handler({ limit: 10, offset: 0, status: "won" });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/auctions/closed", undefined, {
-      limit: 10,
-      offset: 0,
-      status: "won",
-    });
-  });
-
-  it("dynadot_get_auction_details GETs", async () => {
+  it("dynadot_get_auction_details", async () => {
     await findTool("dynadot_get_auction_details").handler({ auctionId: 5 });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/auctions/5");
+    expect(mockRequest).toHaveBeenCalledWith("get_auction_details", { auction_id: 5 });
   });
 
-  it("dynadot_get_whois_stats GETs", async () => {
-    await findTool("dynadot_get_whois_stats").handler({ domainName: "example.com" });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/example.com/whois-stats");
+  it("dynadot_get_auction_bids", async () => {
+    await findTool("dynadot_get_auction_bids").handler({ auctionId: 5 });
+    expect(mockRequest).toHaveBeenCalledWith("get_auction_bids", { auction_id: 5 });
   });
 
-  it("dynadot_backorder_request_list GETs", async () => {
-    await findTool("dynadot_backorder_request_list").handler({ limit: 10, offset: 0 });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/backorders", undefined, {
-      limit: 10,
-      offset: 0,
+  it("dynadot_place_auction_bid", async () => {
+    await findTool("dynadot_place_auction_bid").handler({ auctionId: 5, bidAmount: 100 });
+    expect(mockRequest).toHaveBeenCalledWith("place_auction_bid", { auction_id: 5, bid_amount: 100 });
+  });
+
+  it("dynadot_get_open_backorder_auctions", async () => {
+    await findTool("dynadot_get_open_backorder_auctions").handler({ pageIndex: 0, countPerPage: 100 });
+    expect(mockRequest).toHaveBeenCalledWith("get_open_backorder_auctions", {
+      page_index: 0,
+      count_per_page: 100,
     });
   });
 
-  it("dynadot_place_auction_bid POSTs bid", async () => {
-    await findTool("dynadot_place_auction_bid").handler({ auctionId: 5, bidAmount: 200 });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/aftermarket/auctions/5/bid", { bidAmount: 200 });
-  });
-
-  it("dynadot_get_auction_bids GETs paginated", async () => {
-    await findTool("dynadot_get_auction_bids").handler({ auctionId: 5, limit: 10, offset: 0 });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/auctions/5/bids", undefined, {
-      limit: 10,
-      offset: 0,
+  it("dynadot_get_closed_backorder_auctions", async () => {
+    await findTool("dynadot_get_closed_backorder_auctions").handler({ pageIndex: 0, countPerPage: 100 });
+    expect(mockRequest).toHaveBeenCalledWith("get_closed_backorder_auctions", {
+      page_index: 0,
+      count_per_page: 100,
     });
   });
 
-  it("dynadot_set_auction_installment_plan POSTs", async () => {
-    await findTool("dynadot_set_auction_installment_plan").handler({
-      auctionId: 5,
-      planType: "12mo",
-      paymentTerms: "monthly",
-    });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/aftermarket/auctions/5/installment", {
-      planType: "12mo",
-      paymentTerms: "monthly",
-    });
+  it("dynadot_get_backorder_auction_details", async () => {
+    await findTool("dynadot_get_backorder_auction_details").handler({ auctionId: 5 });
+    expect(mockRequest).toHaveBeenCalledWith("get_backorder_auction_details", { auction_id: 5 });
   });
 
-  it("dynadot_get_auction_installment_plan GETs", async () => {
-    await findTool("dynadot_get_auction_installment_plan").handler({ auctionId: 5 });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/auctions/5/installment");
+  it("dynadot_place_backorder_auction_bid", async () => {
+    await findTool("dynadot_place_backorder_auction_bid").handler({ auctionId: 5, bidAmount: 100 });
+    expect(mockRequest).toHaveBeenCalledWith("place_backorder_auction_bid", { auction_id: 5, bid_amount: 100 });
   });
 
-  it("dynadot_get_open_auctions GETs", async () => {
-    await findTool("dynadot_get_open_auctions").handler({ limit: 10, offset: 0, category: "premium" });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/auctions/open", undefined, {
-      limit: 10,
-      offset: 0,
-      category: "premium",
+  it("dynadot_get_expired_closeout_domains", async () => {
+    await findTool("dynadot_get_expired_closeout_domains").handler({ pageIndex: 0, countPerPage: 100 });
+    expect(mockRequest).toHaveBeenCalledWith("get_expired_closeout_domains", {
+      page_index: 0,
+      count_per_page: 100,
     });
   });
 
-  it("dynadot_create_express_pay_link POSTs", async () => {
-    await findTool("dynadot_create_express_pay_link").handler({ amount: 100, description: "test", expiryDays: 7 });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/aftermarket/express-pay", {
-      amount: 100,
-      description: "test",
-      expiryDays: 7,
+  it("dynadot_buy_expired_closeout_domain", async () => {
+    await findTool("dynadot_buy_expired_closeout_domain").handler({ domainName: "x.com" });
+    expect(mockRequest).toHaveBeenCalledWith("buy_expired_closeout_domain", {
+      domain: "x.com",
+      currency: undefined,
+      coupon: undefined,
     });
   });
 
-  it("dynadot_get_express_pay_link GETs", async () => {
-    await findTool("dynadot_get_express_pay_link").handler({ linkId: "abc" });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/express-pay/abc");
+  it("dynadot_get_listings", async () => {
+    await findTool("dynadot_get_listings").handler({ pageIndex: 0, countPerPage: 5000 });
+    expect(mockRequest).toHaveBeenCalledWith("get_listings", { page_index: 0, count_per_page: 5000 });
   });
 
-  it("dynadot_list_express_pay_link GETs paginated", async () => {
-    await findTool("dynadot_list_express_pay_link").handler({ limit: 10, offset: 0 });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/express-pay", undefined, {
-      limit: 10,
-      offset: 0,
+  it("dynadot_get_listing_item uses listing_id (not domain)", async () => {
+    await findTool("dynadot_get_listing_item").handler({ listingId: 12345 });
+    expect(mockRequest).toHaveBeenCalledWith("get_listing_item", { listing_id: 12345 });
+  });
+
+  it("dynadot_buy_it_now", async () => {
+    await findTool("dynadot_buy_it_now").handler({ listingId: 12345 });
+    expect(mockRequest).toHaveBeenCalledWith("buy_it_now", {
+      listing_id: 12345,
+      currency: undefined,
+      coupon: undefined,
     });
   });
 
-  it("dynadot_delete_express_pay_link DELETEs", async () => {
-    await findTool("dynadot_delete_express_pay_link").handler({ linkId: "abc" });
-    expect(mockRequest).toHaveBeenCalledWith("DELETE", "/aftermarket/express-pay/abc");
-  });
-
-  it("dynadot_get_listings GETs", async () => {
-    await findTool("dynadot_get_listings").handler({ limit: 10, offset: 0, status: "active" });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/listings", undefined, {
-      limit: 10,
-      offset: 0,
-      status: "active",
+  it("dynadot_set_for_sale", async () => {
+    await findTool("dynadot_set_for_sale").handler({ domainName: "x.com", price: 1000 });
+    expect(mockRequest).toHaveBeenCalledWith("set_for_sale", {
+      domain: "x.com",
+      price: 1000,
+      currency: undefined,
     });
   });
 
-  it("dynadot_get_expired_closeout_domains GETs", async () => {
-    await findTool("dynadot_get_expired_closeout_domains").handler({ limit: 10, offset: 0, tld: "com" });
-    expect(mockRequest).toHaveBeenCalledWith("GET", "/aftermarket/expired-closeout", undefined, {
-      limit: 10,
-      offset: 0,
-      tld: "com",
-    });
+  it("dynadot_download_all_listings", async () => {
+    await findTool("dynadot_download_all_listings").handler({});
+    expect(mockRequest).toHaveBeenCalledWith("download_all_listings");
   });
 
-  it("dynadot_listing_on_afternic POSTs", async () => {
-    await findTool("dynadot_listing_on_afternic").handler({ domainName: "example.com", price: 999 });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/aftermarket/example.com/list-afternic", {
-      price: 999,
-      notes: undefined,
-    });
+  it("dynadot_set_afternic_confirm_action", async () => {
+    await findTool("dynadot_set_afternic_confirm_action").handler({ actionId: 5, action: "approve" });
+    expect(mockRequest).toHaveBeenCalledWith("set_afternic_confirm_action", { action_id: 5, action: "approve" });
   });
 
-  it("dynadot_listing_on_sedo POSTs", async () => {
-    await findTool("dynadot_listing_on_sedo").handler({ domainName: "example.com", price: 999, notes: "premium" });
-    expect(mockRequest).toHaveBeenCalledWith("POST", "/aftermarket/example.com/list-sedo", {
-      price: 999,
-      notes: "premium",
-    });
+  it("dynadot_set_sedo_confirm_action", async () => {
+    await findTool("dynadot_set_sedo_confirm_action").handler({ actionId: 5, action: "approve" });
+    expect(mockRequest).toHaveBeenCalledWith("set_sedo_confirm_action", { action_id: 5, action: "approve" });
   });
 });

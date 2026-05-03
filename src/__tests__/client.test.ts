@@ -1,5 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { dynadotRequest } from "../client.js";
+import { dynadotRequest, toPunycode } from "../client.js";
+
+describe("toPunycode", () => {
+  it("returns ASCII domains unchanged", () => {
+    expect(toPunycode("example.com")).toBe("example.com");
+    expect(toPunycode("foo.bar.com")).toBe("foo.bar.com");
+  });
+
+  it("encodes IDN domains to punycode", () => {
+    expect(toPunycode("krämer.ai")).toBe("xn--krmer-hra.ai");
+  });
+});
 
 describe("dynadotRequest", () => {
   const mockFetch = vi.fn();
@@ -17,121 +28,138 @@ describe("dynadotRequest", () => {
 
   it("throws if DYNADOT_API_KEY is not set", async () => {
     vi.stubEnv("DYNADOT_API_KEY", "");
-    await expect(dynadotRequest("GET", "/domains")).rejects.toThrow(
+    await expect(dynadotRequest("account_info")).rejects.toThrow(
       "DYNADOT_API_KEY environment variable is not set"
     );
   });
 
-  it("makes GET request with correct URL and headers", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ data: "test" }),
-    });
-
-    await dynadotRequest("GET", "/domains");
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.dynadot.com/restful/v2/domains",
-      expect.objectContaining({
-        method: "GET",
-        headers: {
-          Authorization: "Bearer test-api-key",
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: undefined,
-      })
-    );
-  });
-
-  it("makes POST request with body", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ id: "123" }),
-    });
-
-    await dynadotRequest("POST", "/domains/register", { domainName: "example.com", years: 1 });
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.dynadot.com/restful/v2/domains/register",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ domainName: "example.com", years: 1 }),
-      })
-    );
-  });
-
-  it("appends query params and filters undefined/null/empty values", async () => {
-    let capturedUrl = "";
+  it("includes key and command query params", async () => {
+    let captured = "";
     mockFetch.mockImplementation((url: string) => {
-      capturedUrl = url;
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({}),
-      });
-    });
-
-    await dynadotRequest("GET", "/domains", undefined, {
-      folder: "personal",
-      limit: 10,
-      empty: undefined,
-      blank: "",
-    });
-
-    const url = new URL(capturedUrl);
-    expect(url.searchParams.get("folder")).toBe("personal");
-    expect(url.searchParams.get("limit")).toBe("10");
-    expect(url.searchParams.has("empty")).toBe(false);
-    expect(url.searchParams.has("blank")).toBe(false);
-  });
-
-  it("repeats array query params", async () => {
-    let capturedUrl = "";
-    mockFetch.mockImplementation((url: string) => {
-      capturedUrl = url;
+      captured = url;
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
 
-    await dynadotRequest("GET", "/domains/bulk-search", undefined, {
-      domainNames: ["a.com", "b.com", "c.com"],
+    await dynadotRequest("account_info");
+
+    const url = new URL(captured);
+    expect(url.origin + url.pathname).toBe("https://api.dynadot.com/api3.json");
+    expect(url.searchParams.get("key")).toBe("test-api-key");
+    expect(url.searchParams.get("command")).toBe("account_info");
+  });
+
+  it("issues a GET request with Accept: application/json", async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+
+    await dynadotRequest("account_info");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        method: "GET",
+        headers: { Accept: "application/json" },
+      })
+    );
+  });
+
+  it("appends scalar params and skips undefined/empty", async () => {
+    let captured = "";
+    mockFetch.mockImplementation((url: string) => {
+      captured = url;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
 
-    const url = new URL(capturedUrl);
-    expect(url.searchParams.getAll("domainNames")).toEqual(["a.com", "b.com", "c.com"]);
+    await dynadotRequest("renew", {
+      domain: "example.com",
+      duration: 1,
+      currency: "USD",
+      coupon: undefined,
+      blank: "",
+    });
+
+    const url = new URL(captured);
+    expect(url.searchParams.get("domain")).toBe("example.com");
+    expect(url.searchParams.get("duration")).toBe("1");
+    expect(url.searchParams.get("currency")).toBe("USD");
+    expect(url.searchParams.has("coupon")).toBe(false);
+    expect(url.searchParams.has("blank")).toBe(false);
+  });
+
+  it("expands array params as name0, name1, ...", async () => {
+    let captured = "";
+    mockFetch.mockImplementation((url: string) => {
+      captured = url;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    await dynadotRequest("search", {
+      domain: ["a.com", "b.com", "c.com"],
+    });
+
+    const url = new URL(captured);
+    expect(url.searchParams.get("domain0")).toBe("a.com");
+    expect(url.searchParams.get("domain1")).toBe("b.com");
+    expect(url.searchParams.get("domain2")).toBe("c.com");
+    expect(url.searchParams.has("domain")).toBe(false);
   });
 
   it("returns parsed JSON on success", async () => {
-    const expected = { domains: [{ name: "example.com" }] };
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(expected),
-    });
+    const expected = { Response: { ResponseHeader: { SuccessCode: 0 } }, data: 1 };
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(expected) });
 
-    const result = await dynadotRequest("GET", "/domains");
+    const result = await dynadotRequest("account_info");
     expect(result).toEqual(expected);
   });
 
-  it("throws on non-2xx response", async () => {
+  it("throws on non-2xx HTTP response", async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 401,
       text: () => Promise.resolve("Unauthorized"),
     });
 
-    await expect(dynadotRequest("GET", "/domains")).rejects.toThrow(
+    await expect(dynadotRequest("account_info")).rejects.toThrow(
       "Dynadot API error 401: Unauthorized"
     );
   });
 
-  it("handles text() failure gracefully on error", async () => {
+  it("throws on application error with code/error.description", async () => {
     mockFetch.mockResolvedValue({
-      ok: false,
-      status: 500,
-      text: () => Promise.reject(new Error("parse failed")),
+      ok: true,
+      json: () => Promise.resolve({
+        code: 400,
+        message: "Bad Request",
+        error: { description: "X-Signature header not entered" },
+      }),
     });
 
-    await expect(dynadotRequest("GET", "/domains")).rejects.toThrow(
-      "Dynadot API error 500:"
+    await expect(dynadotRequest("domain_info", { domain: "x.com" })).rejects.toThrow(
+      "Dynadot API error 400: X-Signature header not entered"
     );
+  });
+
+  it("throws on Response.ResponseHeader SuccessCode != 0", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        Response: { ResponseHeader: { SuccessCode: -1, Error: "invalid command" } },
+      }),
+    });
+
+    await expect(dynadotRequest("foo")).rejects.toThrow("invalid command");
+  });
+
+  it("succeeds when SuccessCode is 0", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        SuccessCode: 0,
+        ResponseHeader: { SuccessCode: 0 },
+        data: "ok",
+      }),
+    });
+
+    const result = await dynadotRequest("account_info");
+    expect((result as any).data).toBe("ok");
   });
 });
