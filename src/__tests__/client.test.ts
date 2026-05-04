@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { dynadotRequest, toPunycode } from "../client.js";
+import { dynadotRequest, dynadotRestRequest, toPunycode } from "../client.js";
 
 describe("toPunycode", () => {
   it("returns ASCII domains unchanged", () => {
@@ -161,5 +161,72 @@ describe("dynadotRequest", () => {
 
     const result = await dynadotRequest("account_info");
     expect((result as any).data).toBe("ok");
+  });
+});
+
+describe("dynadotRestRequest", () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetch);
+    vi.stubEnv("DYNADOT_API_KEY", "test-api-key");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("hits the v2 RESTful base URL with Bearer auth", async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ value: 100 }) });
+
+    await dynadotRestRequest("GET", "/domains/example.com/appraisal");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://api.dynadot.com/restful/v2/domains/example.com/appraisal",
+      expect.objectContaining({
+        method: "GET",
+        headers: {
+          Authorization: "Bearer test-api-key",
+          Accept: "application/json",
+        },
+      })
+    );
+  });
+
+  it("appends scalar query params and skips empties", async () => {
+    let captured = "";
+    mockFetch.mockImplementation((url: string) => {
+      captured = url;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    await dynadotRestRequest("GET", "/test", { a: "1", b: undefined, c: "" });
+
+    const url = new URL(captured);
+    expect(url.searchParams.get("a")).toBe("1");
+    expect(url.searchParams.has("b")).toBe(false);
+    expect(url.searchParams.has("c")).toBe(false);
+  });
+
+  it("throws on non-2xx HTTP response", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: () => Promise.resolve("Not Found"),
+    });
+
+    await expect(dynadotRestRequest("GET", "/missing")).rejects.toThrow(
+      "Dynadot API error 404: Not Found"
+    );
+  });
+
+  it("returns parsed JSON on success", async () => {
+    const expected = { name: "example.com", value: 1234 };
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(expected) });
+
+    const result = await dynadotRestRequest<typeof expected>("GET", "/domains/example.com/appraisal");
+    expect(result).toEqual(expected);
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "@eyalm321/dynadot-mcp",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "MCP server for the Dynadot v3 API (api3.json) — tools for domain registration, DNS, contacts, nameservers, folders, and the aftermarket",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"

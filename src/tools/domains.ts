@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dynadotRequest, toPunycode } from "../client.js";
+import { dynadotRequest, dynadotRestRequest, toPunycode } from "../client.js";
 
 export const domainTools = [
   {
@@ -216,12 +216,12 @@ export const domainTools = [
   },
   {
     name: "dynadot_domain_appraisal",
-    description: "Get an estimated value (appraisal) for a domain.",
+    description: "Get an estimated value (appraisal) for a domain. Uses the v2 RESTful endpoint — Dynadot's v3 query-string API does not expose appraisal as a command.",
     inputSchema: z.object({
       domainName: z.string(),
     }),
     handler: async (args: { domainName: string }) => {
-      return dynadotRequest("domain_appraisal", { domain: toPunycode(args.domainName) });
+      return dynadotRestRequest("GET", `/domains/${encodeURIComponent(toPunycode(args.domainName))}/appraisal`);
     },
   },
   {

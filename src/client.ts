@@ -1,4 +1,5 @@
 const BASE_URL = "https://api.dynadot.com/api3.json";
+const REST_BASE_URL = "https://api.dynadot.com/restful/v2";
 
 function getApiKey(): string {
   const key = process.env.DYNADOT_API_KEY;
@@ -87,4 +88,48 @@ export async function dynadotRequest<T = unknown>(
   }
 
   return data as T;
+}
+
+/**
+ * Make a Dynadot v2 RESTful API request. Most v2 endpoints documented at
+ * dynadot.com/domain/api-document are unreliable (they require an X-Signature
+ * header that isn't documented, or simply don't exist) — but a few endpoints
+ * have no v3 equivalent and are confirmed to work via this path with Bearer
+ * auth. Use sparingly.
+ */
+export async function dynadotRestRequest<T = unknown>(
+  method: string,
+  path: string,
+  params?: Record<string, DynadotParam>
+): Promise<T> {
+  const url = new URL(`${REST_BASE_URL}${path}`);
+
+  if (params) {
+    for (const [name, value] of Object.entries(params)) {
+      if (value === undefined || value === null || value === "") continue;
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (item === undefined || item === null || item === "") return;
+          url.searchParams.append(name, String(item));
+        });
+      } else {
+        url.searchParams.set(name, String(value));
+      }
+    }
+  }
+
+  const res = await fetch(url.toString(), {
+    method,
+    headers: {
+      Authorization: `Bearer ${getApiKey()}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Dynadot API error ${res.status}: ${text}`);
+  }
+
+  return (await res.json()) as T;
 }

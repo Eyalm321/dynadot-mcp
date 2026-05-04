@@ -4,14 +4,16 @@ vi.mock("../../client.js", async () => {
   const actual = await vi.importActual<typeof import("../../client.js")>("../../client.js");
   return {
     dynadotRequest: vi.fn().mockResolvedValue({ success: true }),
+    dynadotRestRequest: vi.fn().mockResolvedValue({ success: true }),
     toPunycode: actual.toPunycode,
   };
 });
 
-import { dynadotRequest } from "../../client.js";
+import { dynadotRequest, dynadotRestRequest } from "../../client.js";
 import { domainTools } from "../../tools/domains.js";
 
 const mockRequest = vi.mocked(dynadotRequest);
+const mockRestRequest = vi.mocked(dynadotRestRequest);
 
 function findTool(name: string) {
   const tool = domainTools.find((t: any) => t.name === name);
@@ -22,6 +24,7 @@ function findTool(name: string) {
 describe("domainTools", () => {
   beforeEach(() => {
     mockRequest.mockClear();
+    mockRestRequest.mockClear();
   });
 
   it("has no duplicate names", () => {
@@ -132,9 +135,15 @@ describe("domainTools", () => {
     expect(mockRequest).toHaveBeenCalledWith("domain_info", { domain: "x.com" });
   });
 
-  it("dynadot_domain_appraisal", async () => {
+  it("dynadot_domain_appraisal uses the v2 REST endpoint (no v3 equivalent)", async () => {
     await findTool("dynadot_domain_appraisal").handler({ domainName: "x.com" });
-    expect(mockRequest).toHaveBeenCalledWith("domain_appraisal", { domain: "x.com" });
+    expect(mockRestRequest).toHaveBeenCalledWith("GET", "/domains/x.com/appraisal");
+    expect(mockRequest).not.toHaveBeenCalled();
+  });
+
+  it("dynadot_domain_appraisal punycodes IDN domains", async () => {
+    await findTool("dynadot_domain_appraisal").handler({ domainName: "krämer.ai" });
+    expect(mockRestRequest).toHaveBeenCalledWith("GET", "/domains/xn--krmer-hra.ai/appraisal");
   });
 
   it("dynadot_lock_domain", async () => {
