@@ -77,7 +77,7 @@ DYNADOT_API_KEY=your_key node dist/index.js
 
 ## Releasing
 
-Pushing to `main` runs CI (tests + build on Node 20 and 22). Publishing to npm and GitHub Packages happens when a GitHub Release is published — bump the version in `package.json`, tag, and create a release; the `Publish` workflow takes it from there.
+Pushing to `main` runs CI (tests + build on Node 22 and 24). Publishing to npm and GitHub Packages happens when a GitHub Release is published — bump the version in `package.json`, tag, and create a release; the `Publish` workflow takes it from there.
 
 ## License
 
