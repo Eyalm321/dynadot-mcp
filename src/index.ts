@@ -12,7 +12,7 @@ import { tldTools } from "./tools/tlds.js";
 
 const server = new McpServer({
   name: "dynadot-mcp",
-  version: "2.0.0",
+  version: "3.0.0",
 });
 
 const allTools = [
